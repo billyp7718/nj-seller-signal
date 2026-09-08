@@ -8,7 +8,9 @@ import {
 } from "lucide-react";
 import { counties, leads, type Lead } from "@/lib/leads";
 import ImportDialog from "@/components/ImportDialog";
-import { getLocalLeads } from "@/lib/local-store";
+import { getLocalLeadCount, getLocalLeads } from "@/lib/local-store";
+
+const LOCAL_PAGE_SIZE = 100;
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -73,6 +75,7 @@ function LeadPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
 
 export default function Dashboard() {
   const [leadData, setLeadData] = useState<Lead[]>(leads);
+  const [storedLeadCount, setStoredLeadCount] = useState(leads.length);
   const [dataMode, setDataMode] = useState<"demo" | "local" | "database" | "locked">("demo");
   const [county, setCounty] = useState("All counties");
   const [query, setQuery] = useState("");
@@ -85,9 +88,13 @@ export default function Dashboard() {
 
   const loadLeads = useCallback(async (accessKey = "") => {
     try {
-      const localLeads = await getLocalLeads();
+      const [localCount, localLeads] = await Promise.all([
+        getLocalLeadCount(),
+        getLocalLeads(LOCAL_PAGE_SIZE),
+      ]);
       if (localLeads.length && !accessKey) {
         setLeadData(localLeads);
+        setStoredLeadCount(localCount);
         setDataMode("local");
         return;
       }
@@ -96,16 +103,24 @@ export default function Dashboard() {
       const result = await response.json();
       if (result.configured && result.leads?.length) {
         setLeadData(result.leads);
+        setStoredLeadCount(result.leads.length);
         setDataMode("database");
       } else {
         setLeadData(leads);
+        setStoredLeadCount(leads.length);
         setDataMode("demo");
       }
     } catch {
       setLeadData(leads);
+      setStoredLeadCount(leads.length);
       setDataMode("demo");
     }
   }, []);
+
+  async function loadMoreLocalLeads() {
+    const nextLeads = await getLocalLeads(LOCAL_PAGE_SIZE, leadData.length);
+    setLeadData((current) => [...current, ...nextLeads]);
+  }
 
   useEffect(() => { void loadLeads(); }, [loadLeads]);
 
@@ -165,7 +180,7 @@ export default function Dashboard() {
           <article><span>Priority opportunities</span><strong>{priorityCount.toLocaleString()}</strong><em>Score of 85 or higher</em></article>
           <article><span>Property value represented</span><strong>{money.format(totalValue)}</strong><em>Public assessment or imported value</em></article>
           <article><span>Potential commission</span><strong>{money.format(totalValue * .025)}</strong><em>Illustrative at 2.5%</em></article>
-          <article><span>Records in view</span><strong>{visibleLeads.length.toLocaleString()}</strong><em>{dataMode === "database" ? "Shared pilot records" : dataMode === "local" ? "Private device records" : "Demonstration records"}</em></article>
+          <article><span>Records stored</span><strong>{storedLeadCount.toLocaleString()}</strong><em>{dataMode === "database" ? "Shared pilot records" : dataMode === "local" ? "Private device records" : "Demonstration records"}</em></article>
         </section>
 
         <section className="radar-card">
@@ -183,7 +198,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="table-meta"><span><strong>{visibleLeads.length}</strong> opportunities shown</span><button onClick={() => { setCounty("All counties"); setQuery(""); setMinimumScore(70); setActiveSignals([]); }}><Filter size={15} />Clear filters</button></div>
+          <div className="table-meta"><span><strong>{visibleLeads.length}</strong> shown{dataMode === "local" && <> · {leadData.length.toLocaleString()} of {storedLeadCount.toLocaleString()} loaded</>}</span><button onClick={() => { setCounty("All counties"); setQuery(""); setMinimumScore(70); setActiveSignals([]); }}><Filter size={15} />Clear filters</button></div>
           <div className="lead-table" role="table" aria-label="Seller opportunities">
             <div className="lead-row table-head" role="row"><span>Property & owner</span><span>Seller score</span><span>Value / equity</span><span>Top signals</span><span>Status</span><span /></div>
             {visibleLeads.map((lead) => (
@@ -198,6 +213,7 @@ export default function Dashboard() {
             ))}
             {visibleLeads.length === 0 && <div className="empty-state"><Search size={26} /><strong>No opportunities match these filters</strong><p>Try expanding the county, score or signal selection.</p></div>}
           </div>
+          {dataMode === "local" && leadData.length < storedLeadCount && <div className="load-more"><button className="secondary-button" onClick={loadMoreLocalLeads}>Load 100 more opportunities</button><span>Results are loaded in small batches to keep the site responsive.</span></div>}
         </section>
         <footer><span>Scores explain the evidence used. Verify property and contact records before outreach.</span><a href="#compliance">NJ compliance & data policy</a></footer>
       </section>
