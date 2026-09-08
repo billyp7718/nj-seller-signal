@@ -1,5 +1,6 @@
 export type Lead = {
   id: number;
+  parcelId?: string;
   owner: string;
   address: string;
   city: string;
@@ -18,6 +19,8 @@ export type Lead = {
   lastEvent: string;
   phone?: string;
   email?: string;
+  propertyClass?: string;
+  source?: string;
 };
 
 export const counties = [
