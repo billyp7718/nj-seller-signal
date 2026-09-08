@@ -65,6 +65,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .radar-heading p { font-size: .76rem; color: var(--muted); margin: 0; }
 .data-badge { border: 1px solid #dce8e2; padding: 5px 9px; border-radius: 99px; font-size: .69rem; color: var(--muted); background: #f8fbf9; }
 .data-badge span { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: var(--amber); margin-right: 4px; }
+.data-badge.database span { background: #2b9b69; }
+.data-badge.locked span { background: #5972a8; }
 .filters { padding: 13px 20px; display: grid; grid-template-columns: minmax(230px, 1.35fr) minmax(190px, .7fr) minmax(190px, .8fr) minmax(135px, .5fr); gap: 9px; border-bottom: 1px solid var(--line); }
 .search, .select-wrap, .score-filter, .signal-filter > button { min-height: 41px; border: 1px solid var(--line); border-radius: 8px; padding: 0 11px; display: flex; align-items: center; gap: 8px; color: var(--muted); background: white; }
 .search input { width: 100%; border: 0; outline: none; color: var(--ink); min-width: 0; }
@@ -147,6 +149,38 @@ footer a { color: var(--pine-2); }
 .outreach p { font-family: Georgia, serif; font-size: .87rem; line-height: 1.62; color: #32423c; }
 .outreach .secondary-button { margin-top: 3px; }
 
+.import-backdrop { align-items: center; justify-content: center; padding: 22px; }
+.import-dialog { width: min(680px, 100%); max-height: calc(100vh - 44px); overflow-y: auto; background: white; border-radius: 15px; box-shadow: 0 26px 80px rgba(10,33,25,.28); padding: 25px; }
+.import-dialog .panel-header h2 { margin-top: 6px; }
+.import-dialog .panel-header p { max-width: 520px; line-height: 1.5; }
+.import-source { display: grid; gap: 10px; padding: 20px 0 14px; }
+.source-step { display: grid; grid-template-columns: 29px 1fr; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.source-step > span { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 8px 8px 8px 3px; background: var(--pine); color: white; font-size: .75rem; font-weight: 850; }
+.source-step strong { font-size: .84rem; }
+.source-step p { margin: 4px 0 8px; color: var(--muted); line-height: 1.45; font-size: .74rem; }
+.source-step a { color: var(--pine-2); font-size: .72rem; font-weight: 750; }
+.file-actions { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.template-link { display: inline-flex; align-items: center; gap: 6px; }
+.file-summary { display: flex; align-items: center; gap: 10px; background: var(--mint); color: var(--pine); padding: 12px 14px; border-radius: 9px; margin-bottom: 14px; }
+.file-summary strong, .file-summary span { display: block; }
+.file-summary strong { font-size: .8rem; }
+.file-summary span { font-size: .68rem; margin-top: 3px; color: #4c7064; }
+.access-field { display: block; margin: 5px 0 14px; }
+.access-field > span { display: flex; align-items: center; gap: 7px; font-size: .73rem; font-weight: 800; margin-bottom: 6px; }
+.access-field input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; color: var(--ink); }
+.import-progress > div { height: 7px; border-radius: 99px; overflow: hidden; background: #e6ece9; }
+.import-progress > div span { height: 100%; display: block; background: var(--pine-2); transition: width .2s ease; }
+.import-progress p { color: var(--muted); font-size: .7rem; }
+.import-message { display: flex; gap: 9px; align-items: flex-start; padding: 11px 12px; border-radius: 8px; background: #edf8f2; color: #26714d; font-size: .74rem; line-height: 1.4; margin-bottom: 12px; }
+.import-message.error { background: #fff1ed; color: #a54428; }
+.import-notice { background: #f6f8f7; border-left: 3px solid var(--amber); padding: 11px 13px; }
+.import-notice strong { font-size: .72rem; }
+.import-notice p { margin: 4px 0 0; color: var(--muted); font-size: .68rem; line-height: 1.45; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 18px; }
+.dialog-actions button:disabled { opacity: .48; cursor: not-allowed; }
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 @media (max-width: 1100px) {
   .app-shell { grid-template-columns: 78px minmax(0, 1fr); }
   .sidebar { padding-inline: 13px; }
@@ -187,4 +221,6 @@ footer a { color: var(--pine-2); }
   footer { display: block; line-height: 1.5; }
   footer a { display: block; margin-top: 5px; }
   .lead-panel { padding: 20px; }
+  .import-backdrop { padding: 8px; }
+  .import-dialog { max-height: calc(100vh - 16px); padding: 19px; }
 }
