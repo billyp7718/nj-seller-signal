@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { counties, leads, type Lead } from "@/lib/leads";
 import ImportDialog from "@/components/ImportDialog";
+import { getLocalLeads } from "@/lib/local-store";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -72,7 +73,7 @@ function LeadPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
 
 export default function Dashboard() {
   const [leadData, setLeadData] = useState<Lead[]>(leads);
-  const [dataMode, setDataMode] = useState<"demo" | "database" | "locked">("demo");
+  const [dataMode, setDataMode] = useState<"demo" | "local" | "database" | "locked">("demo");
   const [county, setCounty] = useState("All counties");
   const [query, setQuery] = useState("");
   const [minimumScore, setMinimumScore] = useState(70);
@@ -84,6 +85,12 @@ export default function Dashboard() {
 
   const loadLeads = useCallback(async (accessKey = "") => {
     try {
+      const localLeads = await getLocalLeads();
+      if (localLeads.length && !accessKey) {
+        setLeadData(localLeads);
+        setDataMode("local");
+        return;
+      }
       const response = await fetch("/api/leads", { headers: { "x-app-key": accessKey }, cache: "no-store" });
       if (response.status === 401) { setDataMode("locked"); return; }
       const result = await response.json();
@@ -158,13 +165,13 @@ export default function Dashboard() {
           <article><span>Priority opportunities</span><strong>{priorityCount.toLocaleString()}</strong><em>Score of 85 or higher</em></article>
           <article><span>Property value represented</span><strong>{money.format(totalValue)}</strong><em>Public assessment or imported value</em></article>
           <article><span>Potential commission</span><strong>{money.format(totalValue * .025)}</strong><em>Illustrative at 2.5%</em></article>
-          <article><span>Records in view</span><strong>{visibleLeads.length.toLocaleString()}</strong><em>{dataMode === "database" ? "Imported pilot records" : "Demonstration records"}</em></article>
+          <article><span>Records in view</span><strong>{visibleLeads.length.toLocaleString()}</strong><em>{dataMode === "database" ? "Shared pilot records" : dataMode === "local" ? "Private device records" : "Demonstration records"}</em></article>
         </section>
 
         <section className="radar-card">
           <div className="radar-heading">
             <div><h2>Opportunity radar</h2><p>Filter by territory and the evidence behind each score.</p></div>
-            <button className={`data-badge ${dataMode}`} onClick={() => setImportOpen(true)}><span />{dataMode === "database" ? "NJ public data" : dataMode === "locked" ? "Data locked" : "Demo data"}</button>
+            <button className={`data-badge ${dataMode}`} onClick={() => setImportOpen(true)}><span />{dataMode === "database" ? "Shared NJ data" : dataMode === "local" ? "Device-only NJ data" : dataMode === "locked" ? "Data locked" : "Demo data"}</button>
           </div>
           <div className="filters">
             <label className="search"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search owner, address or ZIP" /></label>
