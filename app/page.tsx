@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Bell, ChevronDown, Download, Filter, Home, LayoutDashboard, ListFilter, Mail,
+  Bell, ChevronDown, Download, FileUp, Filter, Home, LayoutDashboard, ListFilter, Mail,
   Map, MapPin, MessageSquareText, MoreHorizontal, Phone, Search, SlidersHorizontal,
   Sparkles, Target, TrendingUp, Users, X
 } from "lucide-react";
 import { counties, leads, type Lead } from "@/lib/leads";
+import ImportDialog from "@/components/ImportDialog";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -42,11 +43,11 @@ function LeadPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
           <div><span>Estimated value</span><strong>{money.format(lead.value)}</strong></div>
           <div><span>Estimated equity</span><strong>{lead.equity}%</strong></div>
           <div><span>Years owned</span><strong>{lead.ownershipYears}</strong></div>
-          <div><span>Property</span><strong>{lead.beds} bd · {lead.baths} ba</strong></div>
+          <div><span>Property</span><strong>{lead.beds || lead.baths ? `${lead.beds} bd · ${lead.baths} ba` : lead.propertyType}</strong></div>
         </div>
 
         <section className="panel-section">
-          <div className="section-heading"><h3>Why this lead surfaced</h3><span>{lead.lastEvent}</span></div>
+          <div className="section-heading"><h3>Why this lead surfaced</h3><span>{lead.source || lead.lastEvent}</span></div>
           <div className="signal-list">{lead.signals.map((signal) => <span key={signal}>{signal}</span>)}</div>
         </section>
 
@@ -70,6 +71,8 @@ function LeadPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
 }
 
 export default function Dashboard() {
+  const [leadData, setLeadData] = useState<Lead[]>(leads);
+  const [dataMode, setDataMode] = useState<"demo" | "database" | "locked">("demo");
   const [county, setCounty] = useState("All counties");
   const [query, setQuery] = useState("");
   const [minimumScore, setMinimumScore] = useState(70);
@@ -77,9 +80,30 @@ export default function Dashboard() {
   const [signalsOpen, setSignalsOpen] = useState(false);
   const [activeSignals, setActiveSignals] = useState<string[]>([]);
   const [saved, setSaved] = useState<number[]>([]);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const loadLeads = useCallback(async (accessKey = "") => {
+    try {
+      const response = await fetch("/api/leads", { headers: { "x-app-key": accessKey }, cache: "no-store" });
+      if (response.status === 401) { setDataMode("locked"); return; }
+      const result = await response.json();
+      if (result.configured && result.leads?.length) {
+        setLeadData(result.leads);
+        setDataMode("database");
+      } else {
+        setLeadData(leads);
+        setDataMode("demo");
+      }
+    } catch {
+      setLeadData(leads);
+      setDataMode("demo");
+    }
+  }, []);
+
+  useEffect(() => { void loadLeads(); }, [loadLeads]);
 
   const signalOptions = ["High equity", "Absentee owner", "Expired listing", "Long ownership", "Nearby sale"];
-  const visibleLeads = useMemo(() => leads.filter((lead) => {
+  const visibleLeads = useMemo(() => leadData.filter((lead) => {
     const matchesCounty = county === "All counties" || lead.county === county;
     const haystack = `${lead.owner} ${lead.address} ${lead.city} ${lead.zip}`.toLowerCase();
     const matchesQuery = haystack.includes(query.toLowerCase());
@@ -88,7 +112,22 @@ export default function Dashboard() {
       lead.signals.some((leadSignal) => signal === "Long ownership" ? leadSignal.includes("years owned") : leadSignal === signal)
     );
     return matchesCounty && matchesQuery && matchesScore && matchesSignal;
-  }), [county, query, minimumScore, activeSignals]);
+  }), [county, query, minimumScore, activeSignals, leadData]);
+
+  const totalValue = visibleLeads.reduce((sum, lead) => sum + lead.value, 0);
+  const priorityCount = visibleLeads.filter((lead) => lead.score >= 85).length;
+
+  function exportVisible() {
+    const header = ["parcel_id", "owner", "address", "city", "county", "zip", "score", "assessed_value", "years_owned", "signals"];
+    const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+    const content = [header.join(","), ...visibleLeads.map((lead) => [lead.parcelId || lead.id, lead.owner, lead.address, lead.city, lead.county, lead.zip, lead.score, lead.value, lead.ownershipYears, lead.signals.join("; ")].map(escape).join(","))].join("\n");
+    const url = URL.createObjectURL(new Blob([content], { type: "text/csv" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "nj-seller-opportunities.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   function toggleSignal(signal: string) {
     setActiveSignals((current) => current.includes(signal) ? current.filter((item) => item !== signal) : [...current, signal]);
@@ -112,20 +151,20 @@ export default function Dashboard() {
       <section className="workspace">
         <header className="topbar">
           <div><span className="eyebrow">New Jersey seller intelligence</span><h1>Seller opportunities</h1><p>Prioritize homeowners with transparent, property-level selling signals.</p></div>
-          <div className="top-actions"><button className="secondary-button"><Download size={17} />Export</button><button className="primary-button"><Sparkles size={17} />Create campaign</button></div>
+          <div className="top-actions"><button className="secondary-button" onClick={exportVisible}><Download size={17} />Export</button><button className="primary-button" onClick={() => setImportOpen(true)}><FileUp size={17} />Import NJ data</button></div>
         </header>
 
         <section className="metrics" aria-label="Territory overview">
-          <article><span>Priority opportunities</span><strong>127</strong><em>+18 this week</em></article>
-          <article><span>Estimated listing value</span><strong>$84.6M</strong><em>Across selected territory</em></article>
-          <article><span>Potential commission</span><strong>$2.1M</strong><em>At 2.5% listing side</em></article>
-          <article><span>New property signals</span><strong>46</strong><em>Last 7 days</em></article>
+          <article><span>Priority opportunities</span><strong>{priorityCount.toLocaleString()}</strong><em>Score of 85 or higher</em></article>
+          <article><span>Property value represented</span><strong>{money.format(totalValue)}</strong><em>Public assessment or imported value</em></article>
+          <article><span>Potential commission</span><strong>{money.format(totalValue * .025)}</strong><em>Illustrative at 2.5%</em></article>
+          <article><span>Records in view</span><strong>{visibleLeads.length.toLocaleString()}</strong><em>{dataMode === "database" ? "Imported pilot records" : "Demonstration records"}</em></article>
         </section>
 
         <section className="radar-card">
           <div className="radar-heading">
             <div><h2>Opportunity radar</h2><p>Filter by territory and the evidence behind each score.</p></div>
-            <span className="data-badge"><span /> Demo data</span>
+            <button className={`data-badge ${dataMode}`} onClick={() => setImportOpen(true)}><span />{dataMode === "database" ? "NJ public data" : dataMode === "locked" ? "Data locked" : "Demo data"}</button>
           </div>
           <div className="filters">
             <label className="search"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search owner, address or ZIP" /></label>
@@ -156,6 +195,7 @@ export default function Dashboard() {
         <footer><span>Scores explain the evidence used. Verify property and contact records before outreach.</span><a href="#compliance">NJ compliance & data policy</a></footer>
       </section>
       {selectedLead && <LeadPanel lead={selectedLead} onClose={() => setSelectedLead(null)} />}
+      {importOpen && <ImportDialog onClose={() => setImportOpen(false)} onImported={async (key) => { await loadLeads(key); }} />}
     </main>
   );
 }
