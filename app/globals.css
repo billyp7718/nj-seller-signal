@@ -66,6 +66,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .data-badge { border: 1px solid #dce8e2; padding: 5px 9px; border-radius: 99px; font-size: .69rem; color: var(--muted); background: #f8fbf9; }
 .data-badge span { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: var(--amber); margin-right: 4px; }
 .data-badge.database span { background: #2b9b69; }
+.data-badge.local span { background: #2b9b69; }
 .data-badge.locked span { background: #5972a8; }
 .filters { padding: 13px 20px; display: grid; grid-template-columns: minmax(230px, 1.35fr) minmax(190px, .7fr) minmax(190px, .8fr) minmax(135px, .5fr); gap: 9px; border-bottom: 1px solid var(--line); }
 .search, .select-wrap, .score-filter, .signal-filter > button { min-height: 41px; border: 1px solid var(--line); border-radius: 8px; padding: 0 11px; display: flex; align-items: center; gap: 8px; color: var(--muted); background: white; }
@@ -168,6 +169,8 @@ footer a { color: var(--pine-2); }
 .access-field { display: block; margin: 5px 0 14px; }
 .access-field > span { display: flex; align-items: center; gap: 7px; font-size: .73rem; font-weight: 800; margin-bottom: 6px; }
 .access-field input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; color: var(--ink); }
+.access-field em { margin-left: auto; color: var(--muted); font-style: normal; font-weight: 500; }
+.access-field small { display: block; color: var(--muted); font-size: .67rem; line-height: 1.4; margin-top: 6px; }
 .import-progress > div { height: 7px; border-radius: 99px; overflow: hidden; background: #e6ece9; }
 .import-progress > div span { height: 100%; display: block; background: var(--pine-2); transition: width .2s ease; }
 .import-progress p { color: var(--muted); font-size: .7rem; }
