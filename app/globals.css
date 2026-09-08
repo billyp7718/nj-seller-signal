@@ -85,6 +85,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .table-meta { display: flex; justify-content: space-between; align-items: center; padding: 11px 20px; color: var(--muted); font-size: .74rem; }
 .table-meta button { border: 0; background: transparent; color: var(--pine-2); display: flex; align-items: center; gap: 5px; font-size: .72rem; }
 .lead-table { border-top: 1px solid var(--line); }
+.load-more { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: .76rem; }
 .lead-row { display: grid; grid-template-columns: minmax(285px, 1.55fr) .65fr .75fr 1.1fr .56fr .42fr; gap: 13px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #edf1ef; cursor: pointer; }
 .lead-row:not(.table-head):hover { background: #f7faf8; }
 .lead-row.table-head { min-height: auto; background: #f7f9f8; color: #6d7974; padding-block: 9px; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; cursor: default; }
