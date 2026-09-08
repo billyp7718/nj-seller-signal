@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { CheckCircle2, Database, Download, FileUp, KeyRound, LoaderCircle, X } from "lucide-react";
 import { parseCsv, parseModiv, type ImportLead } from "@/lib/modiv";
+import { saveLocalLeads } from "@/lib/local-store";
 
 type Props = {
   onClose: () => void;
@@ -41,6 +42,14 @@ export default function ImportDialog({ onClose, onImported }: Props) {
     setMessage("");
     setProgress(0);
     try {
+      if (!accessKey) {
+        await saveLocalLeads(rows);
+        setProgress(100);
+        setStatus("done");
+        setMessage(`${rows.length.toLocaleString()} NJ property records were saved privately on this device.`);
+        await onImported("");
+        return;
+      }
       const chunkSize = 250;
       let imported = 0;
       for (let index = 0; index < rows.length; index += chunkSize) {
@@ -50,7 +59,17 @@ export default function ImportDialog({ onClose, onImported }: Props) {
           body: JSON.stringify({ rows: rows.slice(index, index + chunkSize) }),
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Import failed");
+        if (!response.ok) {
+          if (response.status === 503) {
+            await saveLocalLeads(rows);
+            setProgress(100);
+            setStatus("done");
+            setMessage(`${rows.length.toLocaleString()} records were saved privately on this device. Connect Neon later for shared access.`);
+            await onImported("");
+            return;
+          }
+          throw new Error(result.error || "Import failed");
+        }
         imported += result.imported;
         setProgress(Math.round((Math.min(index + chunkSize, rows.length) / rows.length) * 100));
       }
@@ -78,13 +97,13 @@ export default function ImportDialog({ onClose, onImported }: Props) {
 
         {fileName && <div className="file-summary"><Database size={19} /><div><strong>{fileName}</strong><span>{rows.length.toLocaleString()} eligible residential records detected</span></div></div>}
 
-        <label className="access-field"><span><KeyRound size={16} />Pilot access key</span><input type="password" value={accessKey} onChange={(event) => setAccessKey(event.target.value)} placeholder="Enter the key stored in Vercel" autoComplete="current-password" /></label>
+        <label className="access-field"><span><KeyRound size={16} />Shared-database access key <em>optional</em></span><input type="password" value={accessKey} onChange={(event) => setAccessKey(event.target.value)} placeholder="Leave blank for free device-only storage" autoComplete="current-password" /><small>For the no-cost pilot, leave this blank. Records stay inside this browser and are not sent to the public site.</small></label>
 
         {status === "uploading" && <div className="import-progress"><div><span style={{ width: `${progress}%` }} /></div><p>Importing and updating records… {progress}%</p></div>}
         {message && <div className={`import-message ${status}`}><CheckCircle2 size={18} /><span>{message}</span></div>}
 
         <div className="import-notice"><strong>Privacy safeguard</strong><p>NJ-hosted datasets redact protected owner names. Do not upload purchased contact records until this app is access-controlled and your outreach process has been reviewed for compliance.</p></div>
-        <div className="dialog-actions"><button className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button" onClick={upload} disabled={!rows.length || !accessKey || status === "uploading" || status === "done"}>{status === "uploading" && <LoaderCircle className="spin" size={17} />}{status === "done" ? "Import complete" : "Import records"}</button></div>
+        <div className="dialog-actions"><button className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button" onClick={upload} disabled={!rows.length || status === "uploading" || status === "done"}>{status === "uploading" && <LoaderCircle className="spin" size={17} />}{status === "done" ? "Import complete" : "Import records"}</button></div>
       </section>
     </div>
   );
