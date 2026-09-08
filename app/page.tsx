@@ -11,6 +11,7 @@ import ImportDialog from "@/components/ImportDialog";
 import { getLocalLeadCount, getLocalLeads } from "@/lib/local-store";
 
 const LOCAL_PAGE_SIZE = 100;
+type DashboardView = "opportunities" | "map" | "campaigns" | "contacts" | "alerts";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -73,6 +74,62 @@ function LeadPanel({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   );
 }
 
+function TerritoryView({ leadData, onOpenCounty }: { leadData: Lead[]; onOpenCounty: (county: string) => void }) {
+  const countyCounts = useMemo(() => {
+    const totals = new globalThis.Map<string, number>();
+    for (const lead of leadData) totals.set(lead.county, (totals.get(lead.county) || 0) + 1);
+    return counties.slice(1).map((name) => ({ name, count: totals.get(name) || 0 })).sort((a, b) => b.count - a.count);
+  }, [leadData]);
+
+  return (
+    <section className="view-card">
+      <div className="view-heading"><div><h2>NJ territory coverage</h2><p>Opportunity counts from the records currently loaded on this device.</p></div><span>{countyCounts.filter((item) => item.count > 0).length} active counties</span></div>
+      <div className="county-grid">
+        {countyCounts.map((item) => <button key={item.name} onClick={() => onOpenCounty(item.name)}><MapPin size={17} /><span>{item.name}</span><strong>{item.count.toLocaleString()}</strong><small>View opportunities</small></button>)}
+      </div>
+    </section>
+  );
+}
+
+function CampaignsView({ savedLeads, onOpenOpportunities, onExportSaved }: { savedLeads: Lead[]; onOpenOpportunities: () => void; onExportSaved: () => void }) {
+  return (
+    <section className="view-card">
+      <div className="view-heading"><div><h2>Campaign workspace</h2><p>Build a compliant outreach list from the opportunities you save.</p></div><span>Low-cost pilot</span></div>
+      <div className="campaign-grid">
+        <article><Target size={22} /><span>Saved audience</span><strong>{savedLeads.length}</strong><p>Properties selected from the opportunity radar.</p><button className="secondary-button" onClick={onOpenOpportunities}>{savedLeads.length ? "Add more leads" : "Choose opportunities"}</button></article>
+        <article><Mail size={22} /><span>Direct mail</span><strong>Ready to export</strong><p>Use the opportunity CSV with your preferred postcard or letter provider.</p><button className="secondary-button" disabled={!savedLeads.length} onClick={onExportSaved}>Download saved list</button></article>
+        <article><Phone size={22} /><span>Calling workflow</span><strong>Verification required</strong><p>Enrich and scrub numbers against applicable do-not-call requirements first.</p><button className="secondary-button" disabled>Available after enrichment</button></article>
+      </div>
+    </section>
+  );
+}
+
+function ContactsView({ leadData, onSelect }: { leadData: Lead[]; onSelect: (lead: Lead) => void }) {
+  return (
+    <section className="view-card">
+      <div className="view-heading"><div><h2>Property owner directory</h2><p>Owners attached to the currently loaded NJ opportunity records.</p></div><span>{Math.min(leadData.length, 50)} shown</span></div>
+      <div className="contact-list">
+        {leadData.slice(0, 50).map((lead) => <button key={lead.parcelId || lead.id} onClick={() => onSelect(lead)}><div className="avatar">{lead.owner.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div><strong>{lead.owner}</strong><span>{lead.address} · {lead.city}, NJ</span></div><Score value={lead.score} /></button>)}
+      </div>
+    </section>
+  );
+}
+
+function AlertsView({ onOpenOpportunities }: { onOpenOpportunities: () => void }) {
+  const alerts = [
+    { title: "High seller score", detail: "Review records reaching a score of 90 or higher.", status: "Active" },
+    { title: "Long ownership", detail: "Surface owners who have held a property for 20+ years.", status: "Active" },
+    { title: "Absentee signal", detail: "Review properties where the tax mailing address differs.", status: "Active" },
+  ];
+  return (
+    <section className="view-card">
+      <div className="view-heading"><div><h2>Seller signal alerts</h2><p>Your active pilot rules for prioritizing imported NJ records.</p></div><span>3 active rules</span></div>
+      <div className="alert-list">{alerts.map((alert) => <article key={alert.title}><Bell size={19} /><div><strong>{alert.title}</strong><p>{alert.detail}</p></div><span>{alert.status}</span></article>)}</div>
+      <div className="view-actions"><button className="primary-button" onClick={onOpenOpportunities}>Review matching opportunities</button></div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const [leadData, setLeadData] = useState<Lead[]>(leads);
   const [storedLeadCount, setStoredLeadCount] = useState(leads.length);
@@ -85,6 +142,7 @@ export default function Dashboard() {
   const [activeSignals, setActiveSignals] = useState<string[]>([]);
   const [saved, setSaved] = useState<number[]>([]);
   const [importOpen, setImportOpen] = useState(false);
+  const [activeView, setActiveView] = useState<DashboardView>("opportunities");
 
   const loadLeads = useCallback(async (accessKey = "") => {
     try {
@@ -138,17 +196,30 @@ export default function Dashboard() {
 
   const totalValue = visibleLeads.reduce((sum, lead) => sum + lead.value, 0);
   const priorityCount = visibleLeads.filter((lead) => lead.score >= 85).length;
+  const savedIds = useMemo(() => new Set(saved), [saved]);
+  const savedLeads = useMemo(() => leadData.filter((lead) => savedIds.has(lead.id)), [leadData, savedIds]);
+  const viewCopy: Record<DashboardView, { eyebrow: string; title: string; description: string }> = {
+    opportunities: { eyebrow: "New Jersey seller intelligence", title: "Seller opportunities", description: "Prioritize homeowners with transparent, property-level selling signals." },
+    map: { eyebrow: "Territory intelligence", title: "Territory map", description: "See where seller opportunities are concentrated across New Jersey." },
+    campaigns: { eyebrow: "Outreach planning", title: "Campaigns", description: "Turn selected seller opportunities into focused outreach lists." },
+    contacts: { eyebrow: "Owner records", title: "Contacts", description: "Review property owners connected to imported public records." },
+    alerts: { eyebrow: "Signal monitoring", title: "Alerts", description: "Review the rules that surface high-priority seller opportunities." },
+  };
 
-  function exportVisible() {
+  function exportLeadRows(rows: Lead[], filename: string) {
     const header = ["parcel_id", "owner", "address", "city", "county", "zip", "score", "assessed_value", "years_owned", "signals"];
     const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-    const content = [header.join(","), ...visibleLeads.map((lead) => [lead.parcelId || lead.id, lead.owner, lead.address, lead.city, lead.county, lead.zip, lead.score, lead.value, lead.ownershipYears, lead.signals.join("; ")].map(escape).join(","))].join("\n");
+    const content = [header.join(","), ...rows.map((lead) => [lead.parcelId || lead.id, lead.owner, lead.address, lead.city, lead.county, lead.zip, lead.score, lead.value, lead.ownershipYears, lead.signals.join("; ")].map(escape).join(","))].join("\n");
     const url = URL.createObjectURL(new Blob([content], { type: "text/csv" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = "nj-seller-opportunities.csv";
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportVisible() {
+    exportLeadRows(visibleLeads, "nj-seller-opportunities.csv");
   }
 
   function toggleSignal(signal: string) {
@@ -159,12 +230,12 @@ export default function Dashboard() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark"><Home size={18} /></div><div><strong>NJ Seller</strong><span>Signal</span></div></div>
-        <nav>
-          <a className="active" href="#"><LayoutDashboard size={19} />Opportunities</a>
-          <a href="#map"><Map size={19} />Territory map</a>
-          <a href="#campaigns"><Target size={19} />Campaigns</a>
-          <a href="#contacts"><Users size={19} />Contacts</a>
-          <a href="#alerts"><Bell size={19} />Alerts<span className="nav-count">3</span></a>
+        <nav aria-label="Main navigation">
+          <button className={activeView === "opportunities" ? "active" : ""} onClick={() => setActiveView("opportunities")}><LayoutDashboard size={19} />Opportunities</button>
+          <button className={activeView === "map" ? "active" : ""} onClick={() => setActiveView("map")}><Map size={19} />Territory map</button>
+          <button className={activeView === "campaigns" ? "active" : ""} onClick={() => setActiveView("campaigns")}><Target size={19} />Campaigns</button>
+          <button className={activeView === "contacts" ? "active" : ""} onClick={() => setActiveView("contacts")}><Users size={19} />Contacts</button>
+          <button className={activeView === "alerts" ? "active" : ""} onClick={() => setActiveView("alerts")}><Bell size={19} />Alerts<span className="nav-count">3</span></button>
         </nav>
         <div className="sidebar-note"><TrendingUp size={18} /><strong>New Jersey focus</strong><p>21 counties monitored. Data connections are ready to configure.</p></div>
         <div className="account"><div className="avatar dark">BP</div><div><strong>Bill Pantaleo</strong><span>Administrator</span></div><MoreHorizontal size={18} /></div>
@@ -172,10 +243,11 @@ export default function Dashboard() {
 
       <section className="workspace">
         <header className="topbar">
-          <div><span className="eyebrow">New Jersey seller intelligence</span><h1>Seller opportunities</h1><p>Prioritize homeowners with transparent, property-level selling signals.</p></div>
-          <div className="top-actions"><button className="secondary-button" onClick={exportVisible}><Download size={17} />Export</button><button className="primary-button" onClick={() => setImportOpen(true)}><FileUp size={17} />Import NJ data</button></div>
+          <div><span className="eyebrow">{viewCopy[activeView].eyebrow}</span><h1>{viewCopy[activeView].title}</h1><p>{viewCopy[activeView].description}</p></div>
+          <div className="top-actions">{activeView === "opportunities" ? <button className="secondary-button" onClick={exportVisible}><Download size={17} />Export</button> : <button className="secondary-button" onClick={() => setActiveView("opportunities")}><LayoutDashboard size={17} />Opportunities</button>}<button className="primary-button" onClick={() => setImportOpen(true)}><FileUp size={17} />Import NJ data</button></div>
         </header>
 
+        {activeView === "opportunities" ? <>
         <section className="metrics" aria-label="Territory overview">
           <article><span>Priority opportunities</span><strong>{priorityCount.toLocaleString()}</strong><em>Score of 85 or higher</em></article>
           <article><span>Property value represented</span><strong>{money.format(totalValue)}</strong><em>Public assessment or imported value</em></article>
@@ -208,13 +280,14 @@ export default function Dashboard() {
                 <div className="value-cell"><strong>{money.format(lead.value)}</strong><span>{lead.equity}% equity</span></div>
                 <div className="tags"><span>{lead.signals[0]}</span><span>{lead.signals[1]}</span></div>
                 <div><span className={`status ${lead.status.toLowerCase()}`}>{lead.status}</span></div>
-                <div><button className={`save-button ${saved.includes(lead.id) ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); setSaved((current) => current.includes(lead.id) ? current.filter((id) => id !== lead.id) : [...current, lead.id]); }}>{saved.includes(lead.id) ? "Saved" : "Save"}</button></div>
+                <div><button className={`save-button ${savedIds.has(lead.id) ? "saved" : ""}`} onClick={(event) => { event.stopPropagation(); setSaved((current) => current.includes(lead.id) ? current.filter((id) => id !== lead.id) : [...current, lead.id]); }}>{savedIds.has(lead.id) ? "Saved" : "Save"}</button></div>
               </div>
             ))}
             {visibleLeads.length === 0 && <div className="empty-state"><Search size={26} /><strong>No opportunities match these filters</strong><p>Try expanding the county, score or signal selection.</p></div>}
           </div>
           {dataMode === "local" && leadData.length < storedLeadCount && <div className="load-more"><button className="secondary-button" onClick={loadMoreLocalLeads}>Load 100 more opportunities</button><span>Results are loaded in small batches to keep the site responsive.</span></div>}
         </section>
+        </> : activeView === "map" ? <TerritoryView leadData={leadData} onOpenCounty={(selectedCounty) => { setCounty(selectedCounty); setActiveView("opportunities"); }} /> : activeView === "campaigns" ? <CampaignsView savedLeads={savedLeads} onOpenOpportunities={() => setActiveView("opportunities")} onExportSaved={() => exportLeadRows(savedLeads, "nj-seller-saved-campaign.csv")} /> : activeView === "contacts" ? <ContactsView leadData={leadData} onSelect={setSelectedLead} /> : <AlertsView onOpenOpportunities={() => { setMinimumScore(90); setActiveView("opportunities"); }} />}
         <footer><span>Scores explain the evidence used. Verify property and contact records before outreach.</span><a href="#compliance">NJ compliance & data policy</a></footer>
       </section>
       {selectedLead && <LeadPanel lead={selectedLead} onClose={() => setSelectedLead(null)} />}
